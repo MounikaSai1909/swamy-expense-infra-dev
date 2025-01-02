@@ -31,6 +31,16 @@ module "frontend" {
 
 }
 
+module "web_alb" {
+    source = "../../terraform-swamy-aws-sg"
+    sg_name = "web_alb"
+    project_name = var.project_name
+    environment = var.environment
+    sg_description = "SG for frontend Instances"
+    vpc_id = data.aws_ssm_parameter.vpc_id.value
+    common_tags = var.common_tags
+
+}
 module "bastion" {
     source = "../../terraform-swamy-aws-sg"
     sg_name = "bastion"
@@ -131,12 +141,12 @@ resource "aws_security_group_rule" "backend_vpn_http" {
 
 
 
-resource "aws_security_group_rule" "frontend_public" {
+resource "aws_security_group_rule" "frontend_web_alb" {
   type              = "ingress"
   from_port         = 80
   to_port           = 80
   protocol          = "tcp"
-  cidr_blocks = ["0.0.0.0/0"]
+  source_security_group_id = module.web_alb.sg_id 
   security_group_id = module.frontend.sg_id
 }
 
@@ -148,6 +158,34 @@ resource "aws_security_group_rule" "frontend_bastion" {
   source_security_group_id = module.bastion.sg_id  # source is where you are getting traffic from 
   security_group_id = module.frontend.sg_id
 }
+
+resource "aws_security_group_rule" "frontend_vpn" {
+  type              = "ingress"
+  from_port         = 22
+  to_port           = 22
+  protocol          = "tcp"
+  source_security_group_id = module.vpn.sg_id  # source is where you are getting traffic from 
+  security_group_id = module.web_alb.sg_id
+}
+
+resource "aws_security_group_rule" "web_alb_public" {
+  type              = "ingress"
+  from_port         = 80
+  to_port           = 80
+  protocol          = "tcp"
+  cidr_blocks = ["0.0.0.0/0"]
+  security_group_id = module.web_alb.sg_id
+}
+
+resource "aws_security_group_rule" "web_alb_public_https" {
+  type              = "ingress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  cidr_blocks = ["0.0.0.0/0"]
+  security_group_id = module.web_alb.sg_id
+}
+
 
 
 resource "aws_security_group_rule" "bastion_public" {
@@ -165,5 +203,23 @@ resource "aws_security_group_rule" "app-alb_vpn" {
   to_port           = 80
   protocol          = "tcp"
   source_security_group_id = module.vpn.sg_id  # source is where you are getting traffic from 
+  security_group_id = module.app-alb.sg_id
+}
+
+resource "aws_security_group_rule" "app-alb_frontend" {
+  type              = "ingress"
+  from_port         = 80
+  to_port           = 80
+  protocol          = "tcp"
+  source_security_group_id = module.frontend.sg_id  # source is where you are getting traffic from 
+  security_group_id = module.app-alb.sg_id
+}
+
+resource "aws_security_group_rule" "app-alb_bastion" {
+  type              = "ingress"
+  from_port         = 80
+  to_port           = 80
+  protocol          = "tcp"
+  source_security_group_id = module.bastion.sg_id  # source is where you are getting traffic from 
   security_group_id = module.app-alb.sg_id
 }

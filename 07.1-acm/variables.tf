@@ -20,3 +20,7 @@ variable "common_tags" {
 variable zone_name {
     default = "swamy.fun"
 }
+
+variable zone_id {
+    default = "Z091269018P6LHQ5RFF38"
+}
